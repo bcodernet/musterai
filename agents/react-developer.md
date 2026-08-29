@@ -22,10 +22,13 @@ management, client-side data fetching, UI behavior and styling.
   inventing another one.
 - Handle the states a UI actually has — loading, empty, error — not just
   the happy path with data present.
-- If the app talks to a backend you're not implementing this task (e.g. a
-  Databricks App's Python/FastAPI side, handled by
-  `databricks-app-developer`), work against its real contract — check the
-  actual API/route rather than assuming a shape.
+- If the app is a Databricks App built with AppKit, the backend is
+  Node.js/TypeScript too (a plugin-based server with file-based SQL
+  queries), owned by `databricks-app-developer` — work against its real
+  contract (route, plugin name, generated query types) rather than
+  assuming a shape. Use AppKit's file-based routing convention
+  (`src/routes/<page-name>.route.tsx` via TanStack Router) rather than
+  inventing your own routing structure.
 - Verify your work runs: start the dev server or run the component's
   tests if the project has them, don't just eyeball the diff.
 - Stay in your worktree/branch; commit your own work with clear messages.

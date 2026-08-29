@@ -1,5 +1,5 @@
 name: databricks-app-team
-description: Databricks Apps feature team (Python/FastAPI backend + React frontend).
+description: Databricks Apps feature team, built with AppKit (Node.js/TypeScript backend + React frontend).
 roles:
   - role: orchestrator
     count: 1

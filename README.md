@@ -57,7 +57,7 @@ muster stop-team <team-name>        # close its herdr workspace, remove its work
 | `data-analyzer` | sonnet | no | exploratory, read-only |
 | `data-engineer` | opus | yes | pipelines, Databricks/Spark |
 | `react-developer` | opus | yes | frontend |
-| `databricks-app-developer` | opus | yes | Databricks Apps backend + integration |
+| `databricks-app-developer` | opus | yes | Databricks Apps backend + integration (AppKit: Node.js/TS) |
 | `sql-analytics-engineer` | sonnet | yes | warehouse SQL models, metrics |
 | `devops-infra` | sonnet | yes | CI/CD, Asset Bundles, infra |
 | `docs-writer` | haiku | yes | README/CONTEXT.md/ADRs |
