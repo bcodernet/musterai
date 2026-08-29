@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# teams — list MusterAI's currently tracked teams, or show one team's detail.
+#
+# Usage:
+#   teams              # summary table of every tracked team
+#   teams <name>        # that team's full agent list (name, role, tab/pane, worktree)
+set -euo pipefail
+
+MUSTER_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$MUSTER_HOME/bin/lib.sh"
+
+DIR="$(muster_state_dir)"
+
+if [[ $# -ge 1 && -n "$1" ]]; then
+  TEAM="$1"
+  FILE="$(muster_state_file "$TEAM")"
+  [[ -f "$FILE" ]] || muster_die "no active team named '$TEAM' ($FILE not found). Run 'muster teams' with no name to list them all."
+
+  echo "team:      $(jq -r '.team_name' "$FILE")"
+  echo "workspace: $(jq -r '.workspace_id' "$FILE")"
+  echo "project:   $(jq -r '.project_dir' "$FILE")"
+  echo "created:   $(jq -r '.created_at' "$FILE")"
+  echo
+  printf '%-28s %-28s %-8s %-8s %s\n' "NAME" "ROLE" "TAB" "PANE" "WORKTREE"
+  jq -r '.agents[] | [.name, .role, .tab_id, .pane_id, (.worktree_path // "")] | @tsv' "$FILE" |
+    while IFS=$'\t' read -r name role tab pane wt; do
+      printf '%-28s %-28s %-8s %-8s %s\n' "$name" "$role" "$tab" "$pane" "${wt:--}"
+    done
+  exit 0
+fi
+
+shopt -s nullglob
+FILES=("$DIR"/*.json)
+shopt -u nullglob
+
+if [[ ${#FILES[@]} -eq 0 ]]; then
+  echo "no active teams (nothing tracked in $DIR)"
+  exit 0
+fi
+
+# Cross-check each team's herdr workspace still actually exists — the state
+# file can go stale if a workspace got closed some other way (e.g. by hand
+# in herdr) instead of via `stop-team`.
+LIVE_IDS="$(herdr workspace list 2>/dev/null | jq -r '.result.workspaces[].workspace_id' || true)"
+
+printf '%-24s %-10s %-6s %-6s %-21s %s\n' "TEAM" "WORKSPACE" "STATUS" "AGENTS" "CREATED" "PROJECT"
+STALE_COUNT=0
+for f in "${FILES[@]}"; do
+  team=$(jq -r '.team_name' "$f")
+  ws=$(jq -r '.workspace_id' "$f")
+  created=$(jq -r '.created_at' "$f")
+  project=$(jq -r '.project_dir' "$f")
+  count=$(jq '.agents | length' "$f")
+  status="stale"
+  grep -qx "$ws" <<<"$LIVE_IDS" && status="live"
+  [[ "$status" == "stale" ]] && STALE_COUNT=$((STALE_COUNT + 1))
+  printf '%-24s %-10s %-6s %-6s %-21s %s\n' "$team" "$ws" "$status" "$count" "$created" "$project"
+done
+
+if [[ $STALE_COUNT -gt 0 ]]; then
+  echo
+  echo "note: $STALE_COUNT team(s) marked stale — their herdr workspace is gone but MusterAI still has state for them (e.g. it was closed by hand instead of via stop-team). 'muster stop-team <name> --force' clears the leftover state/worktrees." >&2
+fi

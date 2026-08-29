@@ -33,19 +33,23 @@ creating a real git worktree, so it's the safe way to try something new.
    muster team builder,builder,tester-reviewer   # repeat a role for 2 builders
                                                    # -> named builder, builder-2
 
-5. Watch the team (plain herdr commands — MusterAI doesn't wrap these)
+5. See what's active (you'll need this to know a team's name later)
+   muster teams                               # every tracked team + its name
+   muster teams my-feature                    # one team's full agent/pane detail
+
+6. Watch the team (plain herdr commands — MusterAI doesn't wrap these)
    herdr agent list                           # every agent pane + live state
    herdr agent read <name>                    # peek at one agent's output
    herdr pane zoom <pane-id>                  # punch one pane to full-tab size
    herdr pane zoom --toggle --current         # zoom the pane you're in, then
                                                # run it again to un-zoom
 
-6. Direct the team (what the orchestrator role does on your behalf)
+7. Direct the team (what the orchestrator role does on your behalf)
    herdr agent prompt react-developer "start on the login form" --wait
    herdr agent prompt tester-reviewer "review the react-developer worktree" \
      --wait --until idle,done,blocked
 
-7. Tear down when you're done
+8. Tear down when you're done
    muster stop-team my-feature                # closes the workspace, removes
                                                # worktrees; prompts first if
                                                # anything's uncommitted/unmerged
@@ -54,6 +58,6 @@ creating a real git worktree, so it's the safe way to try something new.
 A good first exercise: from inside a real project,
    muster team planner-builder-tester practice-1 --dry-run
 read the output (it shows the exact herdr + claude commands it would run),
-then drop --dry-run and run it for real. `herdr agent list` afterward shows
-your new team; `muster stop-team practice-1` cleans it up when you're done.
+then drop --dry-run and run it for real. `muster teams` afterward shows your
+new team; `muster stop-team practice-1` cleans it up when you're done.
 EOF

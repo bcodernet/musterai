@@ -14,6 +14,10 @@ roles:
 examples:
     @"{{muster_home}}/bin/examples"
 
+# List currently active teams (or `just teams <name>` for one team's agent detail).
+teams name="":
+    @"{{muster_home}}/bin/teams" "{{name}}"
+
 # List available team presets.
 presets:
     @for f in "{{muster_home}}"/teams/*.yaml; do \

@@ -9,6 +9,7 @@ persona files, and team presets on top of two tools you already run.
 muster team databricks-app-team     # orchestrator + react-developer + databricks-app-developer + tester-reviewer
 muster team data-pipeline-team      # orchestrator + data-analyzer + data-engineer + sql-analytics-engineer
 muster spawn data-engineer          # just one agent, on its own
+muster teams                        # which teams are currently active, and their names
 muster stop-team <team-name>        # close its herdr workspace, remove its worktrees
 ```
 
@@ -42,8 +43,12 @@ muster stop-team <team-name>        # close its herdr workspace, remove its work
   <name> "<task>" --wait`) instead of just being a planning persona you drive
   by hand.
 - Team state (which herdr workspace, which panes, which worktrees) is
-  tracked in `~/.muster/teams/<team-name>.json` — that's what `stop-team`
-  reads to tear things down, and what it checks before removing a worktree
+  tracked in `~/.muster/teams/<team-name>.json` — `just teams` lists every
+  team's name from these files (cross-checked against herdr, flagging any
+  whose workspace was closed some other way as stale); `just teams <name>`
+  shows one team's full agent/pane/worktree detail. That's also what
+  `stop-team` reads to tear things down, and what it checks before removing
+  a worktree
   with uncommitted or unmerged work.
 
 ## Roles
