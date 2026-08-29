@@ -58,12 +58,18 @@ $END_MARKER"
 
 RC=""
 if [[ -n "${ZSH_VERSION:-}" || "$SHELL" == */zsh ]]; then
-  RC="$HOME/.zshrc"
+  # zsh reads .zshrc from $ZDOTDIR when it's set (common with dotfiles setups
+  # that relocate zsh config under ~/.config/zsh or similar) — NOT from $HOME
+  # in that case. Ask zsh itself rather than guessing, so this can't drift
+  # from whatever the user's actual dotfiles do.
+  ZDOTDIR_RESOLVED="$(zsh -c 'echo "${ZDOTDIR:-$HOME}"' 2>/dev/null || echo "$HOME")"
+  RC="$ZDOTDIR_RESOLVED/.zshrc"
 elif [[ -n "${BASH_VERSION:-}" || "$SHELL" == */bash ]]; then
   RC="$HOME/.bashrc"
 else
   RC="$HOME/.profile"
 fi
+echo "  target rc file: $RC"
 
 if [[ -f "$RC" ]] && grep -qF "$MARKER" "$RC"; then
   # Replace the existing block in place (handles a moved/renamed repo path).
