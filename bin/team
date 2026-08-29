@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+# team — spin up a whole team of agents at once, tiled as panes in one shared
+# herdr workspace so you can see everyone at a glance (zoom into any one pane
+# with `herdr pane zoom` when you need to read/interact with it in detail).
+#
+# Usage:
+#   team <preset-name|role1,role2,...> [team-name] [--dry-run]
+#
+# <preset-name> looks up teams/<preset-name>.yaml (a role+count list). Anything
+# that isn't a matching preset file is treated as an ad hoc comma-separated list
+# of roles (repeat a role to get more than one instance of it, e.g.
+# `builder,builder,tester-reviewer`).
+#
+# A tab holds at most MAX_PANES_PER_TAB agents, tiled via round-robin binary
+# splits (alternating right/down) so the grid stays roughly balanced; a team
+# bigger than that overflows into additional tabs in the same workspace.
+#
+# Run from inside the target project's git repo.
+set -euo pipefail
+
+MUSTER_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$MUSTER_HOME/bin/lib.sh"
+
+MAX_PANES_PER_TAB=6
+
+[[ $# -ge 1 ]] || muster_die "usage: team <preset-name|role1,role2,...> [team-name] [--dry-run]"
+SPEC="$1"; shift
+
+TEAM_NAME=""
+DRY_RUN=""
+if [[ $# -gt 0 && "$1" != --* ]]; then
+  # A non-empty positional here is the team name; an empty one is just's
+  # empty-default placeholder (`team_name=""`) and gets consumed without using it.
+  [[ -n "$1" ]] && TEAM_NAME="$1"
+  shift
+fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    *) muster_die "team: unknown option '$1'" ;;
+  esac
+done
+[[ -n "$TEAM_NAME" ]] || TEAM_NAME="${SPEC//,/-}-$(date +%s)"
+DRY_RUN_FLAG=0
+[[ -n "$DRY_RUN" ]] && DRY_RUN_FLAG=1
+
+PRESET_FILE="$MUSTER_HOME/teams/${SPEC}.yaml"
+ROLES=()
+if [[ -f "$PRESET_FILE" ]]; then
+  while IFS='|' read -r role count; do
+    for ((i = 0; i < count; i++)); do ROLES+=("$role"); done
+  done < <(yq -r '.roles[] | "\(.role)|\(.count // 1)"' "$PRESET_FILE")
+else
+  IFS=',' read -ra ROLES <<<"$SPEC"
+fi
+[[ ${#ROLES[@]} -gt 0 ]] || muster_die "no roles resolved from '$SPEC' (no teams/${SPEC}.yaml, and it doesn't look like a comma-separated role list)"
+for role in "${ROLES[@]}"; do
+  muster_require_role "$role"
+done
+
+PROJECT_DIR="$(pwd)"
+muster_require_git_repo "$PROJECT_DIR"
+
+# Instance names (bash 3.2 has no associative arrays, hence the nested-loop count).
+NAMES=()
+for i in "${!ROLES[@]}"; do
+  role="${ROLES[$i]}"
+  n=0
+  for ((j = 0; j <= i; j++)); do
+    [[ "${ROLES[$j]}" == "$role" ]] && n=$((n + 1))
+  done
+  name="$role"
+  [[ "$n" -gt 1 ]] && name="${role}-${n}"
+  NAMES+=("$name")
+done
+
+# Each agent's worktree path/branch (empty for non-write roles).
+WORKTREE_PATHS=()
+BRANCHES=()
+for i in "${!ROLES[@]}"; do
+  role="${ROLES[$i]}"; name="${NAMES[$i]}"
+  if [[ "$(muster_role_field "$role" worktree false)" == "true" ]]; then
+    WORKTREE_PATHS+=("$(muster_worktree_path "$PROJECT_DIR" "$name")")
+    BRANCHES+=("muster/${name}")
+  else
+    WORKTREE_PATHS+=("")
+    BRANCHES+=("")
+  fi
+done
+
+# cwd to actually open a pane at: the real worktree path, or PROJECT_DIR for
+# non-worktree roles (and for worktree roles under --dry-run, since the real
+# worktree was never created).
+pane_cwd_for() {
+  local gi="$1"
+  if [[ -n "${WORKTREE_PATHS[$gi]}" && -z "$DRY_RUN" ]]; then
+    echo "${WORKTREE_PATHS[$gi]}"
+  else
+    echo "$PROJECT_DIR"
+  fi
+}
+
+TOTAL=${#ROLES[@]}
+echo "spinning up team '$TEAM_NAME': ${ROLES[*]} (${TOTAL} agent$([[ $TOTAL -ne 1 ]] && echo s))" >&2
+
+WORKSPACE_ID=""
+idx=0
+while [[ $idx -lt $TOTAL ]]; do
+  remaining=$((TOTAL - idx))
+  batch=$((remaining < MAX_PANES_PER_TAB ? remaining : MAX_PANES_PER_TAB))
+
+  # Create worktrees for this batch before placing any panes, so each pane's
+  # --cwd points somewhere real by the time it's opened.
+  for ((k = 0; k < batch; k++)); do
+    gi=$((idx + k))
+    wt="${WORKTREE_PATHS[$gi]}"
+    [[ -z "$wt" ]] && continue
+    if [[ -n "$DRY_RUN" ]]; then
+      muster_log "[dry-run] would create git worktree at $wt on branch ${BRANCHES[$gi]}"
+    else
+      [[ -e "$wt" ]] && muster_die "worktree path already exists: $wt"
+      mkdir -p "$(dirname "$wt")"
+      muster_log "creating git worktree for ${NAMES[$gi]} at $wt (branch ${BRANCHES[$gi]})"
+      git -C "$PROJECT_DIR" worktree add -q -b "${BRANCHES[$gi]}" "$wt" HEAD
+    fi
+  done
+
+  first_gi=$idx
+  if [[ -z "$WORKSPACE_ID" ]]; then
+    RESULT_JSON=$(herdr workspace create --cwd "$(pane_cwd_for "$first_gi")" --label "${NAMES[$first_gi]}" --focus)
+    WORKSPACE_ID=$(jq -r '.result.workspace.workspace_id' <<<"$RESULT_JSON")
+  else
+    RESULT_JSON=$(herdr tab create --workspace "$WORKSPACE_ID" --cwd "$(pane_cwd_for "$first_gi")" --label "${NAMES[$first_gi]}" --no-focus)
+  fi
+  TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
+  ROOT_PANE=$(jq -r '.result.root_pane.pane_id' <<<"$RESULT_JSON")
+
+  # Tile the rest of this batch off the root pane: round-robin binary splits,
+  # alternating direction, so panes stay roughly balanced instead of spiraling.
+  PANE_FOR=("$ROOT_PANE")
+  LEAVES=("$ROOT_PANE")
+  direction="right"
+  for ((k = 1; k < batch; k++)); do
+    gi=$((idx + k))
+    target="${LEAVES[0]}"
+    LEAVES=("${LEAVES[@]:1}")
+    SPLIT_JSON=$(herdr pane split --pane "$target" --direction "$direction" --ratio 0.5 --cwd "$(pane_cwd_for "$gi")" --no-focus)
+    NEW_PANE=$(jq -r '.result.pane.pane_id' <<<"$SPLIT_JSON")
+    LEAVES+=("$target" "$NEW_PANE")
+    PANE_FOR+=("$NEW_PANE")
+    [[ "$direction" == "right" ]] && direction="down" || direction="right"
+  done
+
+  for ((k = 0; k < batch; k++)); do
+    gi=$((idx + k))
+    muster_launch_agent "$TEAM_NAME" "$PROJECT_DIR" "$WORKSPACE_ID" "$TAB_ID" "${PANE_FOR[$k]}" \
+      "${ROLES[$gi]}" "${NAMES[$gi]}" "${WORKTREE_PATHS[$gi]}" "${BRANCHES[$gi]}" "" "$DRY_RUN_FLAG"
+    echo "  + ${NAMES[$gi]} (${ROLES[$gi]})" >&2
+  done
+
+  idx=$((idx + batch))
+done
+
+echo "team '$TEAM_NAME' is up (workspace $WORKSPACE_ID) — $(muster_state_file "$TEAM_NAME")" >&2
+echo "stop with: just stop-team $TEAM_NAME" >&2

@@ -1,0 +1,11 @@
+name: data-pipeline-team
+description: Data engineering / analytics pipeline team.
+roles:
+  - role: orchestrator
+    count: 1
+  - role: data-analyzer
+    count: 1
+  - role: data-engineer
+    count: 1
+  - role: sql-analytics-engineer
+    count: 1

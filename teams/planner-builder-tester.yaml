@@ -1,0 +1,11 @@
+name: planner-builder-tester
+description: General-purpose software task team.
+roles:
+  - role: orchestrator
+    count: 1
+  - role: planner
+    count: 1
+  - role: builder
+    count: 1
+  - role: tester-reviewer
+    count: 1

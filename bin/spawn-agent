@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# spawn-agent — launch one MusterAI role, solo, as a claude process in its own
+# new herdr workspace. (For multi-agent teams sharing one tiled workspace, see
+# `team` — it places panes itself and calls the same launch/record logic.)
+#
+# Usage:
+#   spawn-agent <role> [instance-name] [options]
+#
+# Options:
+#   --team <name>       State-file/team name to record this agent under.
+#                        Defaults to the instance name, so a solo spawn-agent
+#                        call is its own one-agent "team" and can be torn down
+#                        with `stop-team <instance-name>`.
+#   --model <alias>      Override the role's default model for this launch.
+#   --no-worktree         Force no worktree even if the role normally gets one.
+#   --dry-run              Print what would happen; create the herdr workspace
+#                           (harmless, no process launched) but skip starting
+#                           claude and skip creating a real git worktree.
+#
+# Run from inside the target project's git repo. Prints the herdr workspace_id
+# on stdout.
+set -euo pipefail
+
+MUSTER_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$MUSTER_HOME/bin/lib.sh"
+
+[[ $# -ge 1 ]] || muster_die "usage: spawn-agent <role> [instance-name] [options]"
+ROLE="$1"; shift
+
+INSTANCE_NAME="$ROLE"
+if [[ $# -gt 0 && "$1" != --* ]]; then
+  # A non-empty positional here is the instance name; an empty one is just's
+  # empty-default placeholder (`name=""`) and gets consumed without using it.
+  [[ -n "$1" ]] && INSTANCE_NAME="$1"
+  shift
+fi
+
+TEAM_NAME=""
+MODEL_OVERRIDE=""
+NO_WORKTREE=""
+DRY_RUN=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --team) TEAM_NAME="$2"; shift 2 ;;
+    --model) MODEL_OVERRIDE="$2"; shift 2 ;;
+    --no-worktree) NO_WORKTREE=1; shift ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    *) muster_die "spawn-agent: unknown option '$1'" ;;
+  esac
+done
+[[ -n "$TEAM_NAME" ]] || TEAM_NAME="$INSTANCE_NAME"
+
+muster_require_role "$ROLE"
+PROJECT_DIR="$(pwd)"
+muster_require_git_repo "$PROJECT_DIR"
+
+WORKTREE="$(muster_role_field "$ROLE" worktree false)"
+[[ -n "$NO_WORKTREE" ]] && WORKTREE="false"
+
+AGENT_CWD="$PROJECT_DIR"
+WORKTREE_PATH=""
+BRANCH_NAME=""
+if [[ "$WORKTREE" == "true" ]]; then
+  BRANCH_NAME="muster/${INSTANCE_NAME}"
+  WORKTREE_PATH="$(muster_worktree_path "$PROJECT_DIR" "$INSTANCE_NAME")"
+  if [[ -n "$DRY_RUN" ]]; then
+    muster_log "[dry-run] would create git worktree at $WORKTREE_PATH on branch $BRANCH_NAME"
+  else
+    [[ -e "$WORKTREE_PATH" ]] && muster_die "worktree path already exists: $WORKTREE_PATH (pick a different instance name, or clean it up first)"
+    mkdir -p "$(dirname "$WORKTREE_PATH")"
+    muster_log "creating git worktree for $INSTANCE_NAME at $WORKTREE_PATH (branch $BRANCH_NAME)"
+    git -C "$PROJECT_DIR" worktree add -q -b "$BRANCH_NAME" "$WORKTREE_PATH" HEAD
+  fi
+  AGENT_CWD="$WORKTREE_PATH"
+fi
+
+# In --dry-run, a worktree-role's AGENT_CWD may not exist on disk yet (we skipped
+# creating it) — open the herdr pane at the real project dir instead so the call
+# itself doesn't fail, while still logging what the real cwd would be.
+HERDR_CWD="$AGENT_CWD"
+[[ -n "$DRY_RUN" && "$WORKTREE" == "true" ]] && HERDR_CWD="$PROJECT_DIR"
+
+RESULT_JSON=$(herdr workspace create --cwd "$HERDR_CWD" --label "$INSTANCE_NAME" --focus)
+WORKSPACE_ID=$(jq -r '.result.workspace.workspace_id' <<<"$RESULT_JSON")
+TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
+PANE_ID=$(jq -r '.result.root_pane.pane_id' <<<"$RESULT_JSON")
+
+DRY_RUN_FLAG=0
+[[ -n "$DRY_RUN" ]] && DRY_RUN_FLAG=1
+muster_launch_agent "$TEAM_NAME" "$PROJECT_DIR" "$WORKSPACE_ID" "$TAB_ID" "$PANE_ID" \
+  "$ROLE" "$INSTANCE_NAME" "$WORKTREE_PATH" "$BRANCH_NAME" "$MODEL_OVERRIDE" "$DRY_RUN_FLAG"
+
+muster_log "$INSTANCE_NAME ($ROLE) is up — team '$TEAM_NAME', workspace $WORKSPACE_ID"
+echo "$WORKSPACE_ID"

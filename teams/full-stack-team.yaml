@@ -1,0 +1,19 @@
+name: full-stack-team
+description: Larger effort touching data, app, and infra at once.
+roles:
+  - role: orchestrator
+    count: 1
+  - role: planner
+    count: 1
+  - role: data-engineer
+    count: 1
+  - role: react-developer
+    count: 1
+  - role: databricks-app-developer
+    count: 1
+  - role: devops-infra
+    count: 1
+  - role: tester-reviewer
+    count: 1
+  - role: docs-writer
+    count: 1

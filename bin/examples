@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# examples — walk through common MusterAI commands, for learning/practice.
+# Read-only: prints text, makes no herdr/git calls of its own.
+set -euo pipefail
+
+cat <<'EOF'
+MusterAI — examples
+
+Everything below assumes you're inside the project repo you want the agents
+to work on (not this MusterAI repo) — `cd` there first, same as any other
+project-scoped tool. All of these accept --dry-run: it prints exactly what
+would happen (including the real herdr command) without launching claude or
+creating a real git worktree, so it's the safe way to try something new.
+
+1. Get oriented
+   muster roles                              # the 11 available personas
+   muster presets                            # the 4 built-in team presets
+
+2. Spawn one agent, solo
+   muster spawn data-engineer                # instance named "data-engineer"
+   muster spawn data-engineer db-migration    # give it a custom instance name
+   muster spawn builder "" --dry-run          # preview first — note the empty
+                                               # "" placeholder when you want
+                                               # to skip the name but pass flags
+
+3. Spin up a known team (a preset)
+   muster team planner-builder-tester         # general software task team
+   muster team databricks-app-team my-feature # name the team yourself
+   muster team data-pipeline-team --dry-run   # preview a bigger team first
+
+4. Spin up an ad hoc team (comma-separated roles, no preset needed)
+   muster team react-developer,tester-reviewer
+   muster team builder,builder,tester-reviewer   # repeat a role for 2 builders
+                                                   # -> named builder, builder-2
+
+5. Watch the team (plain herdr commands — MusterAI doesn't wrap these)
+   herdr agent list                           # every agent pane + live state
+   herdr agent read <name>                    # peek at one agent's output
+   herdr pane zoom <pane-id>                  # punch one pane to full-tab size
+   herdr pane zoom --toggle --current         # zoom the pane you're in, then
+                                               # run it again to un-zoom
+
+6. Direct the team (what the orchestrator role does on your behalf)
+   herdr agent prompt react-developer "start on the login form" --wait
+   herdr agent prompt tester-reviewer "review the react-developer worktree" \
+     --wait --until idle,done,blocked
+
+7. Tear down when you're done
+   muster stop-team my-feature                # closes the workspace, removes
+                                               # worktrees; prompts first if
+                                               # anything's uncommitted/unmerged
+   muster stop-team my-feature --force        # skip the prompt, discard anyway
+
+A good first exercise: from inside a real project,
+   muster team planner-builder-tester practice-1 --dry-run
+read the output (it shows the exact herdr + claude commands it would run),
+then drop --dry-run and run it for real. `herdr agent list` afterward shows
+your new team; `muster stop-team practice-1` cleans it up when you're done.
+EOF

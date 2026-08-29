@@ -1,0 +1,11 @@
+name: databricks-app-team
+description: Databricks Apps feature team (Python/FastAPI backend + React frontend).
+roles:
+  - role: orchestrator
+    count: 1
+  - role: react-developer
+    count: 1
+  - role: databricks-app-developer
+    count: 1
+  - role: tester-reviewer
+    count: 1
