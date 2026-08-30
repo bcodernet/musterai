@@ -11,12 +11,17 @@ muster_die() {
 
 # muster_agent_name <team> <suffix>
 # Builds a herdr-safe agent name: "<team>-<suffix>" (suffix is a role, or
-# role-N for a repeated role). herdr caps agent names at 32 characters —
-# when the natural name is too long, this truncates the team portion and
-# appends a short checksum of the *full* original name, so two long team
-# names that happen to share a prefix still can't collide after truncation.
+# role-N for a repeated role). herdr agent names must be lowercase
+# [a-z0-9_-], 1-32 characters — team names are user-typed (e.g.
+# "WeightLossTracking") and not held to that, so this sanitizes
+# defensively regardless of casing/punctuation, and caps at 32 characters
+# by truncating the team portion and appending a short checksum of the
+# *full* original name, so two long team names sharing a prefix still
+# can't collide after truncation.
 muster_agent_name() {
-  local team="$1" suffix="$2"
+  local team suffix
+  team="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')"
+  suffix="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9_-' '-')"
   local full="${team}-${suffix}"
   if [[ ${#full} -le 32 ]]; then
     echo "$full"
