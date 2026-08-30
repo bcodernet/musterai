@@ -4,12 +4,18 @@
 # with `herdr pane zoom` when you need to read/interact with it in detail).
 #
 # Usage:
-#   team <preset-name|role1,role2,...> [team-name] [--dry-run]
+#   team <preset-name|role1,role2,...> [team-name] [--dry-run] [--no-orchestrator]
 #
 # <preset-name> looks up teams/<preset-name>.yaml (a role+count list). Anything
 # that isn't a matching preset file is treated as an ad hoc comma-separated list
 # of roles (repeat a role to get more than one instance of it, e.g.
 # `builder,builder,tester-reviewer`).
+#
+# Every team gets an `orchestrator` — your single point of contact, who
+# dispatches to and monitors the rest of the team — added automatically as
+# the first agent unless one is already in the role list. Pass
+# --no-orchestrator to opt out (e.g. a lean ad hoc pairing you intend to
+# drive yourself).
 #
 # A tab holds at most MAX_PANES_PER_TAB agents, tiled via round-robin binary
 # splits (alternating right/down) so the grid stays roughly balanced; a team
@@ -28,6 +34,7 @@ SPEC="$1"; shift
 
 TEAM_NAME=""
 DRY_RUN=""
+NO_ORCHESTRATOR=""
 if [[ $# -gt 0 && "$1" != --* ]]; then
   # A non-empty positional here is the team name; an empty one is just's
   # empty-default placeholder (`team_name=""`) and gets consumed without using it.
@@ -37,6 +44,7 @@ fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
+    --no-orchestrator) NO_ORCHESTRATOR=1; shift ;;
     *) muster_die "team: unknown option '$1'" ;;
   esac
 done
@@ -54,6 +62,18 @@ else
   IFS=',' read -ra ROLES <<<"$SPEC"
 fi
 [[ ${#ROLES[@]} -gt 0 ]] || muster_die "no roles resolved from '$SPEC' (no teams/${SPEC}.yaml, and it doesn't look like a comma-separated role list)"
+
+# Every team gets an orchestrator by default — the single point of contact
+# who dispatches/monitors the rest of the team — unless one's already in the
+# list or --no-orchestrator opted out.
+if [[ -z "$NO_ORCHESTRATOR" ]]; then
+  HAS_ORCHESTRATOR=""
+  for role in "${ROLES[@]}"; do
+    [[ "$role" == "orchestrator" ]] && HAS_ORCHESTRATOR=1 && break
+  done
+  [[ -z "$HAS_ORCHESTRATOR" ]] && ROLES=("orchestrator" "${ROLES[@]}")
+fi
+
 for role in "${ROLES[@]}"; do
   muster_require_role "$role"
 done

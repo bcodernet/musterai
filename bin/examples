@@ -32,6 +32,10 @@ creating a real git worktree, so it's the safe way to try something new.
    muster team react-developer,tester-reviewer
    muster team builder,builder,tester-reviewer   # repeat a role for 2 builders
                                                    # -> named builder, builder-2
+   # every team gets an orchestrator added automatically as your single
+   # point of contact — talk to it, it dispatches to the rest of the team.
+   # opt out for a lean pairing you'll drive yourself:
+   muster team react-developer,tester-reviewer my-pair --no-orchestrator
 
 5. See what's active (you'll need this to know a team's name later)
    muster teams                               # every tracked team + its name

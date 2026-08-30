@@ -41,7 +41,14 @@ muster stop-team <team-name>        # close its herdr workspace, remove its work
 - `orchestrator` additionally gets `--allowed-tools "Bash(herdr *)"`, so it
   can dispatch to and monitor teammate panes itself (`herdr agent prompt
   <name> "<task>" --wait`) instead of just being a planning persona you drive
-  by hand.
+  by hand. It's your single point of contact for a team: `just team` adds
+  one automatically to every team (preset or ad hoc) as the first agent
+  unless one's already in the role list, so there's always a consistent
+  answer to "who do I talk to." Pass `--no-orchestrator` to opt out for a
+  lean pairing you intend to drive yourself. Communication is pull, not
+  push: teammates don't message the orchestrator — it polls their herdr
+  status (idle/working/blocked/done) via `--wait`, and only it (not
+  teammates) has `herdr` access at all.
 - Team state (which herdr workspace, which panes, which worktrees) is
   tracked in `~/.muster/teams/<team-name>.json` — `just teams` lists every
   team's name from these files (cross-checked against herdr, flagging any
