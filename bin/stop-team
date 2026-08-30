@@ -55,7 +55,7 @@ while IFS=$'\t' read -r path branch; do
   # are deterministic: muster/<instance-name>). Safe at this point: we've
   # already confirmed above (or --force) that anything unmerged/uncommitted
   # was OK to discard.
-  if [[ -n "$branch" && "$branch" != "null" ]] && git -C "$PROJECT_DIR" show-ref --verify --quiet "refs/heads/$branch"; then
+  if [[ -n "$branch" && "$branch" != "null" && -d "$PROJECT_DIR" ]] && git -C "$PROJECT_DIR" show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
     git -C "$PROJECT_DIR" branch -D "$branch" >/dev/null 2>&1 && echo "removed branch $branch" >&2
   fi
 done < <(jq -r '.agents[] | select(.worktree_path != "") | [.worktree_path, .branch] | @tsv' "$STATE_FILE")

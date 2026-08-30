@@ -110,7 +110,31 @@ muster_launch_agent() {
     muster_log "[dry-run] would run: herdr agent start '$name' --kind claude --pane '$pane_id' -- ${claude_args[*]}"
   else
     muster_log "starting claude --agent $role ($model) in pane $pane_id"
-    herdr agent start "$name" --kind claude --pane "$pane_id" -- "${claude_args[@]}" >/dev/null
+    # A pane split right before launch (the normal case — team creates the
+    # whole grid before starting anyone) briefly leaves it "agent_pane_busy"
+    # in herdr even though it's really at a shell prompt; the very next
+    # attempt succeeds. Retry a few times on that specific error before
+    # giving up; any other error fails immediately.
+    local attempt=1 max_attempts=5 result rc error_code
+    while true; do
+      # The `if` guards this from set -e: a bare `result=$(...)` assignment
+      # would abort the whole script on the very first failure, before the
+      # retry logic below ever ran.
+      if result=$(herdr agent start "$name" --kind claude --pane "$pane_id" -- "${claude_args[@]}" 2>&1); then
+        rc=0
+      else
+        rc=$?
+      fi
+      [[ $rc -eq 0 ]] && break
+      error_code=$(jq -r '.error.code // empty' <<<"$result" 2>/dev/null)
+      if [[ "$error_code" == "agent_pane_busy" && $attempt -lt $max_attempts ]]; then
+        muster_log "pane $pane_id still settling after being split — retrying ($attempt/$max_attempts)"
+        sleep 0.3
+        attempt=$((attempt + 1))
+        continue
+      fi
+      muster_die "failed to start claude in pane $pane_id: $result"
+    done
   fi
 
   muster_record_agent "$team" "$project_dir" "$workspace_id" "$name" "$role" "$tab_id" "$pane_id" "$worktree_path" "$branch"
