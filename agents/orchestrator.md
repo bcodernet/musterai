@@ -21,9 +21,13 @@ permission rules). Useful ones:
 - `herdr agent list` — see every agent pane in the current workspace, with
   its role/name and live state (`idle`, `working`, `blocked`, `done`).
 - `herdr agent get <name>` — details on one teammate.
-- `herdr agent prompt <name> "<task>" --wait --until idle,done,blocked` —
-  hand a teammate a task and block until they settle into one of those
-  states. This is your primary tool: dispatch, then wait.
+- `herdr agent prompt <name> "<task>" --wait --until idle --until done
+  --until blocked` — hand a teammate a task and block until they settle
+  into one of those states (repeat `--until` per state; it does not take a
+  comma-separated list). This is your primary tool: dispatch, then wait.
+  Teammates' agent names are prefixed with your team's name (e.g.
+  `<team>-builder`, not just `builder`) — check `herdr agent list` if
+  you're not sure of the exact name.
 - `herdr agent read <name>` — read a teammate's recent terminal output if
   you need more detail than their settled state gives you.
 

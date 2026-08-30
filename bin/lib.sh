@@ -9,6 +9,47 @@ muster_die() {
   exit 1
 }
 
+# muster_agent_name <team> <suffix>
+# Builds a herdr-safe agent name: "<team>-<suffix>" (suffix is a role, or
+# role-N for a repeated role). herdr caps agent names at 32 characters —
+# when the natural name is too long, this truncates the team portion and
+# appends a short checksum of the *full* original name, so two long team
+# names that happen to share a prefix still can't collide after truncation.
+muster_agent_name() {
+  local team="$1" suffix="$2"
+  local full="${team}-${suffix}"
+  if [[ ${#full} -le 32 ]]; then
+    echo "$full"
+    return
+  fi
+
+  # h + 3 digits: short enough that even our longest role name (with a -N
+  # repeat suffix) still fits alongside it; still enough entropy that two
+  # concurrent teams colliding on it is not a realistic concern at this
+  # tool's scale.
+  local hash budget
+  hash=$(printf 'h%03d' $(( $(printf '%s' "$full" | cksum | cut -d' ' -f1) % 1000 )))
+
+  # Prefer keeping some of the team name: <team_trunc>-<hash>-<suffix>.
+  budget=$((32 - ${#suffix} - ${#hash} - 2))
+  if [[ $budget -ge 1 ]]; then
+    echo "${team:0:$budget}-${hash}-${suffix}"
+    return
+  fi
+
+  # No room for any team portion — <hash>-<suffix>.
+  budget=$((32 - ${#suffix} - ${#hash} - 1))
+  if [[ $budget -ge 0 ]]; then
+    echo "${hash}-${suffix}"
+    return
+  fi
+
+  # Suffix itself is too long even alone with the hash (an unusually long
+  # role name combined with a double-digit repeat count) — truncate it too.
+  budget=$((32 - ${#hash} - 1))
+  echo "${hash}-${suffix:0:$budget}"
+}
+
 muster_require_role() {
   local role="$1"
   [[ -f "$MUSTER_HOME/agents/${role}.md" ]] || {
@@ -136,6 +177,13 @@ muster_launch_agent() {
       muster_die "failed to start claude in pane $pane_id: $result"
     done
   fi
+
+  # --dry-run should have zero lasting effect. Recording it anyway would let
+  # a later real run under the same team/instance name silently collide: the
+  # state file would already exist pointing at the (fake/throwaway) dry-run
+  # workspace, so the real run's actual workspace would never get tracked —
+  # stop-team would close the wrong one and orphan the real one forever.
+  [[ "$dry_run" == "1" ]] && return 0
 
   muster_record_agent "$team" "$project_dir" "$workspace_id" "$name" "$role" "$tab_id" "$pane_id" "$worktree_path" "$branch"
 }

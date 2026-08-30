@@ -81,7 +81,16 @@ done
 PROJECT_DIR="$(pwd)"
 muster_require_git_repo "$PROJECT_DIR"
 
-# Instance names (bash 3.2 has no associative arrays, hence the nested-loop count).
+# Instance names, prefixed with the team name (bash 3.2 has no associative
+# arrays, hence the nested-loop count). herdr requires agent names to be
+# unique across the *whole* herdr session, not just within one workspace —
+# without the team-name prefix, two concurrently-running teams that both
+# happen to use a role like "builder" (the common case, since it's the
+# default instance name) collide: herdr refuses the second agent_start, and
+# the worktree/branch for that role would collide too, since both are also
+# keyed by instance name. Team names are already required to be distinct
+# (state is keyed by team name), so prefixing with it is enough to make
+# every instance name unique session-wide.
 NAMES=()
 for i in "${!ROLES[@]}"; do
   role="${ROLES[$i]}"
@@ -89,9 +98,9 @@ for i in "${!ROLES[@]}"; do
   for ((j = 0; j <= i; j++)); do
     [[ "${ROLES[$j]}" == "$role" ]] && n=$((n + 1))
   done
-  name="$role"
-  [[ "$n" -gt 1 ]] && name="${role}-${n}"
-  NAMES+=("$name")
+  suffix="$role"
+  [[ "$n" -gt 1 ]] && suffix="${role}-${n}"
+  NAMES+=("$(muster_agent_name "$TEAM_NAME" "$suffix")")
 done
 
 # Each agent's worktree path/branch (empty for non-write roles).
@@ -147,18 +156,34 @@ while [[ $idx -lt $TOTAL ]]; do
   batch_num=$((idx / MAX_PANES_PER_TAB + 1))
   label="$TEAM_NAME"
   [[ $batch_num -gt 1 ]] && label="$TEAM_NAME ($batch_num)"
-  if [[ -z "$WORKSPACE_ID" ]]; then
+
+  # --dry-run has zero lasting effect, herdr included: no real workspace, no
+  # real panes. A dry-run and a later real run sharing a team/instance name
+  # must never collide — a fake workspace recorded as real would make
+  # stop-team close the wrong (fake) one and orphan the real one forever.
+  if [[ -n "$DRY_RUN" ]]; then
+    if [[ -z "$WORKSPACE_ID" ]]; then
+      muster_log "[dry-run] would create herdr workspace --label '$label' --cwd $(pane_cwd_for "$first_gi")"
+      WORKSPACE_ID="dry-run-workspace"
+    else
+      muster_log "[dry-run] would create herdr tab --label '$label' --cwd $(pane_cwd_for "$first_gi")"
+    fi
+    TAB_ID="dry-run-tab-${batch_num}"
+    ROOT_PANE="dry-run-pane-$((first_gi + 1))"
+  elif [[ -z "$WORKSPACE_ID" ]]; then
     RESULT_JSON=$(herdr workspace create --cwd "$(pane_cwd_for "$first_gi")" --label "$label" --focus)
     WORKSPACE_ID=$(jq -r '.result.workspace.workspace_id' <<<"$RESULT_JSON")
     # workspace create's --label sets the *workspace* label but its
     # auto-created first tab still defaults to "1" — rename it to match.
     FIRST_TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
     herdr tab rename "$FIRST_TAB_ID" "$label" >/dev/null
+    TAB_ID="$FIRST_TAB_ID"
+    ROOT_PANE=$(jq -r '.result.root_pane.pane_id' <<<"$RESULT_JSON")
   else
     RESULT_JSON=$(herdr tab create --workspace "$WORKSPACE_ID" --cwd "$(pane_cwd_for "$first_gi")" --label "$label" --no-focus)
+    TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
+    ROOT_PANE=$(jq -r '.result.root_pane.pane_id' <<<"$RESULT_JSON")
   fi
-  TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
-  ROOT_PANE=$(jq -r '.result.root_pane.pane_id' <<<"$RESULT_JSON")
 
   # Tile the rest of this batch off the root pane: round-robin binary splits,
   # alternating direction, so panes stay roughly balanced instead of spiraling.
@@ -169,8 +194,13 @@ while [[ $idx -lt $TOTAL ]]; do
     gi=$((idx + k))
     target="${LEAVES[0]}"
     LEAVES=("${LEAVES[@]:1}")
-    SPLIT_JSON=$(herdr pane split --pane "$target" --direction "$direction" --ratio 0.5 --cwd "$(pane_cwd_for "$gi")" --no-focus)
-    NEW_PANE=$(jq -r '.result.pane.pane_id' <<<"$SPLIT_JSON")
+    if [[ -n "$DRY_RUN" ]]; then
+      muster_log "[dry-run] would split pane $target ($direction) for ${NAMES[$gi]} --cwd $(pane_cwd_for "$gi")"
+      NEW_PANE="dry-run-pane-$((gi + 1))"
+    else
+      SPLIT_JSON=$(herdr pane split --pane "$target" --direction "$direction" --ratio 0.5 --cwd "$(pane_cwd_for "$gi")" --no-focus)
+      NEW_PANE=$(jq -r '.result.pane.pane_id' <<<"$SPLIT_JSON")
+    fi
     LEAVES+=("$target" "$NEW_PANE")
     PANE_FOR+=("$NEW_PANE")
     [[ "$direction" == "right" ]] && direction="down" || direction="right"
@@ -186,5 +216,9 @@ while [[ $idx -lt $TOTAL ]]; do
   idx=$((idx + batch))
 done
 
-echo "team '$TEAM_NAME' is up (workspace $WORKSPACE_ID) — $(muster_state_file "$TEAM_NAME")" >&2
-echo "stop with: just stop-team $TEAM_NAME" >&2
+if [[ -n "$DRY_RUN" ]]; then
+  echo "[dry-run] nothing was actually created — no herdr workspace, no state file" >&2
+else
+  echo "team '$TEAM_NAME' is up (workspace $WORKSPACE_ID) — $(muster_state_file "$TEAM_NAME")" >&2
+  echo "stop with: just stop-team $TEAM_NAME" >&2
+fi

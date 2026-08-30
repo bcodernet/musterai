@@ -29,13 +29,17 @@ creating a real git worktree, so it's the safe way to try something new.
    muster team data-pipeline-team --dry-run   # preview a bigger team first
 
 4. Spin up an ad hoc team (comma-separated roles, no preset needed)
-   muster team react-developer,tester-reviewer
-   muster team builder,builder,tester-reviewer   # repeat a role for 2 builders
-                                                   # -> named builder, builder-2
+   muster team react-developer,tester-reviewer my-pair
+   muster team builder,builder,tester-reviewer my-fix   # repeat a role for 2 builders
+                                                          # -> named my-fix-builder, my-fix-builder-2
    # every team gets an orchestrator added automatically as your single
    # point of contact — talk to it, it dispatches to the rest of the team.
    # opt out for a lean pairing you'll drive yourself:
    muster team react-developer,tester-reviewer my-pair --no-orchestrator
+   # every instance name is prefixed with the team name (my-fix-builder, not
+   # just builder) — herdr requires agent names to be unique across your
+   # *whole* herdr session, so two teams both using the default "builder"
+   # name would otherwise collide the moment both are running at once.
 
 5. See what's active (you'll need this to know a team's name later)
    muster teams                               # every tracked team + its name
@@ -48,10 +52,12 @@ creating a real git worktree, so it's the safe way to try something new.
    herdr pane zoom --toggle --current         # zoom the pane you're in, then
                                                # run it again to un-zoom
 
-7. Direct the team (what the orchestrator role does on your behalf)
-   herdr agent prompt react-developer "start on the login form" --wait
-   herdr agent prompt tester-reviewer "review the react-developer worktree" \
-     --wait --until idle,done,blocked
+7. Direct the team (what the orchestrator role does on your behalf) —
+   agent names include the team-name prefix (see #4), and --until takes a
+   repeated flag per state, not a comma-separated list:
+   herdr agent prompt my-pair-react-developer "start on the login form" --wait
+   herdr agent prompt my-pair-tester-reviewer "review the react-developer worktree" \
+     --wait --until idle --until done --until blocked
 
 8. Tear down when you're done
    muster stop-team my-feature                # closes the workspace, removes

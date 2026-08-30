@@ -72,16 +72,19 @@ if [[ "$WORKTREE" == "true" ]]; then
   AGENT_CWD="$WORKTREE_PATH"
 fi
 
-# In --dry-run, a worktree-role's AGENT_CWD may not exist on disk yet (we skipped
-# creating it) — open the herdr pane at the real project dir instead so the call
-# itself doesn't fail, while still logging what the real cwd would be.
-HERDR_CWD="$AGENT_CWD"
-[[ -n "$DRY_RUN" && "$WORKTREE" == "true" ]] && HERDR_CWD="$PROJECT_DIR"
-
-RESULT_JSON=$(herdr workspace create --cwd "$HERDR_CWD" --label "$INSTANCE_NAME" --focus)
-WORKSPACE_ID=$(jq -r '.result.workspace.workspace_id' <<<"$RESULT_JSON")
-TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
-PANE_ID=$(jq -r '.result.root_pane.pane_id' <<<"$RESULT_JSON")
+if [[ -n "$DRY_RUN" ]]; then
+  # --dry-run has zero lasting effect, herdr included: no real workspace,
+  # no real pane. Placeholder IDs are just for the log lines below.
+  muster_log "[dry-run] would create herdr workspace (--cwd $AGENT_CWD --label $INSTANCE_NAME)"
+  WORKSPACE_ID="dry-run-workspace"
+  TAB_ID="dry-run-tab"
+  PANE_ID="dry-run-pane"
+else
+  RESULT_JSON=$(herdr workspace create --cwd "$AGENT_CWD" --label "$INSTANCE_NAME" --focus)
+  WORKSPACE_ID=$(jq -r '.result.workspace.workspace_id' <<<"$RESULT_JSON")
+  TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
+  PANE_ID=$(jq -r '.result.root_pane.pane_id' <<<"$RESULT_JSON")
+fi
 
 DRY_RUN_FLAG=0
 [[ -n "$DRY_RUN" ]] && DRY_RUN_FLAG=1
