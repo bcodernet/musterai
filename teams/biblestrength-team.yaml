@@ -3,6 +3,8 @@ description: BibleStrength (React Native + Firebase) feature team.
 roles:
   - role: orchestrator
     count: 1
+  - role: planner
+    count: 1
   - role: react-native-developer
     count: 1
   - role: tester-reviewer

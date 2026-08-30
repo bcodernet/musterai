@@ -146,11 +146,18 @@ while [[ $idx -lt $TOTAL ]]; do
   done
 
   first_gi=$idx
+  batch_num=$((idx / MAX_PANES_PER_TAB + 1))
+  label="$TEAM_NAME"
+  [[ $batch_num -gt 1 ]] && label="$TEAM_NAME ($batch_num)"
   if [[ -z "$WORKSPACE_ID" ]]; then
-    RESULT_JSON=$(herdr workspace create --cwd "$(pane_cwd_for "$first_gi")" --label "${NAMES[$first_gi]}" --focus)
+    RESULT_JSON=$(herdr workspace create --cwd "$(pane_cwd_for "$first_gi")" --label "$label" --focus)
     WORKSPACE_ID=$(jq -r '.result.workspace.workspace_id' <<<"$RESULT_JSON")
+    # workspace create's --label sets the *workspace* label but its
+    # auto-created first tab still defaults to "1" — rename it to match.
+    FIRST_TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
+    herdr tab rename "$FIRST_TAB_ID" "$label" >/dev/null
   else
-    RESULT_JSON=$(herdr tab create --workspace "$WORKSPACE_ID" --cwd "$(pane_cwd_for "$first_gi")" --label "${NAMES[$first_gi]}" --no-focus)
+    RESULT_JSON=$(herdr tab create --workspace "$WORKSPACE_ID" --cwd "$(pane_cwd_for "$first_gi")" --label "$label" --no-focus)
   fi
   TAB_ID=$(jq -r '.result.tab.tab_id' <<<"$RESULT_JSON")
   ROOT_PANE=$(jq -r '.result.root_pane.pane_id' <<<"$RESULT_JSON")
