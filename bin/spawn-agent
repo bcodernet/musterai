@@ -66,10 +66,8 @@ if [[ "$WORKTREE" == "true" ]]; then
   if [[ -n "$DRY_RUN" ]]; then
     muster_log "[dry-run] would create git worktree at $WORKTREE_PATH on branch $BRANCH_NAME"
   else
-    [[ -e "$WORKTREE_PATH" ]] && muster_die "worktree path already exists: $WORKTREE_PATH (pick a different instance name, or clean it up first)"
-    mkdir -p "$(dirname "$WORKTREE_PATH")"
     muster_log "creating git worktree for $INSTANCE_NAME at $WORKTREE_PATH (branch $BRANCH_NAME)"
-    git -C "$PROJECT_DIR" worktree add -q -b "$BRANCH_NAME" "$WORKTREE_PATH" HEAD
+    muster_create_worktree "$PROJECT_DIR" "$WORKTREE_PATH" "$BRANCH_NAME"
   fi
   AGENT_CWD="$WORKTREE_PATH"
 fi

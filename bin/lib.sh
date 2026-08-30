@@ -57,6 +57,37 @@ muster_worktree_path() {
   echo "$HOME/.muster/worktrees/$(basename "$project_dir")/${name}"
 }
 
+# muster_create_worktree <project_dir> <path> <branch>
+# Creates a git worktree at <path> on a new branch <branch> off HEAD.
+# Branch names are deterministic (muster/<instance-name>), so respawning the
+# same instance name in the same project collides with a branch left behind
+# by an earlier team `stop-team` never tore down (a manually-closed
+# workspace, a crash, or simply an older MusterAI that didn't clean up
+# branches yet). If the branch exists, isn't checked out anywhere, and is
+# fully merged into HEAD, it's safe leftover — replaced automatically. If it
+# has real unmerged commits, refuse rather than silently discard someone's
+# actual work.
+muster_create_worktree() {
+  local project_dir="$1" path="$2" branch="$3"
+
+  [[ -e "$path" ]] && muster_die "worktree path already exists: $path (pick a different instance name, or clean it up first)"
+
+  if git -C "$project_dir" show-ref --verify --quiet "refs/heads/$branch"; then
+    if git -C "$project_dir" worktree list --porcelain | grep -qx "branch refs/heads/$branch"; then
+      muster_die "branch '$branch' is already checked out in another worktree — run 'git -C \"$project_dir\" worktree list' to find it, or pick a different instance name."
+    fi
+    if git -C "$project_dir" merge-base --is-ancestor "$branch" HEAD 2>/dev/null; then
+      muster_log "branch '$branch' already exists but is fully merged (leftover from an earlier team) — replacing it"
+      git -C "$project_dir" branch -D "$branch" >/dev/null
+    else
+      muster_die "branch '$branch' already exists with commits not merged into $(git -C "$project_dir" branch --show-current) — likely real work from an earlier run that never got cleaned up. Review it first (git -C \"$project_dir\" log $branch), then either merge it or remove it yourself (git -C \"$project_dir\" branch -D $branch), or pick a different instance name."
+    fi
+  fi
+
+  mkdir -p "$(dirname "$path")"
+  git -C "$project_dir" worktree add -q -b "$branch" "$path" HEAD
+}
+
 # muster_launch_agent <team> <project_dir> <workspace_id> <tab_id> <pane_id> <role> <name> <worktree_path> <branch> <model_override> <dry_run:0|1>
 # Resolves the role's model/permission-mode/allowed-tools, starts claude in an
 # already-placed pane (or logs what it would run, under --dry-run), and records

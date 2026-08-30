@@ -44,11 +44,21 @@ fi
 echo "closing herdr workspace $WORKSPACE_ID" >&2
 herdr workspace close "$WORKSPACE_ID" >/dev/null 2>&1 || echo "  (already closed, or not found)" >&2
 
-while IFS= read -r path; do
-  [[ -z "$path" || "$path" == "null" || ! -d "$path" ]] && continue
-  echo "removing worktree $path" >&2
-  git -C "$PROJECT_DIR" worktree remove --force "$path" 2>/dev/null || rm -rf "$path"
-done < <(jq -r '.agents[].worktree_path' "$STATE_FILE")
+while IFS=$'\t' read -r path branch; do
+  [[ -z "$path" || "$path" == "null" ]] && continue
+  if [[ -d "$path" ]]; then
+    echo "removing worktree $path" >&2
+    git -C "$PROJECT_DIR" worktree remove --force "$path" 2>/dev/null || rm -rf "$path"
+  fi
+  # Delete the branch too — worktree removal alone leaves it behind, which
+  # collides with the next team that reuses this instance name (branch names
+  # are deterministic: muster/<instance-name>). Safe at this point: we've
+  # already confirmed above (or --force) that anything unmerged/uncommitted
+  # was OK to discard.
+  if [[ -n "$branch" && "$branch" != "null" ]] && git -C "$PROJECT_DIR" show-ref --verify --quiet "refs/heads/$branch"; then
+    git -C "$PROJECT_DIR" branch -D "$branch" >/dev/null 2>&1 && echo "removed branch $branch" >&2
+  fi
+done < <(jq -r '.agents[] | select(.worktree_path != "") | [.worktree_path, .branch] | @tsv' "$STATE_FILE")
 
 rm -f "$STATE_FILE"
 echo "team '$TEAM_NAME' stopped" >&2

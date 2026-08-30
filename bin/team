@@ -138,10 +138,8 @@ while [[ $idx -lt $TOTAL ]]; do
     if [[ -n "$DRY_RUN" ]]; then
       muster_log "[dry-run] would create git worktree at $wt on branch ${BRANCHES[$gi]}"
     else
-      [[ -e "$wt" ]] && muster_die "worktree path already exists: $wt"
-      mkdir -p "$(dirname "$wt")"
       muster_log "creating git worktree for ${NAMES[$gi]} at $wt (branch ${BRANCHES[$gi]})"
-      git -C "$PROJECT_DIR" worktree add -q -b "${BRANCHES[$gi]}" "$wt" HEAD
+      muster_create_worktree "$PROJECT_DIR" "$wt" "${BRANCHES[$gi]}"
     fi
   done
 
