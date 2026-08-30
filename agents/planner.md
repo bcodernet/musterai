@@ -13,6 +13,15 @@ approach themselves.
 
 ## How you work
 
+- Check for `MUSTER_BRIEF.md` at the project root first — if `orchestrator`
+  already reached a shared understanding with the human (often via a
+  structured interview like the `grilling` skill), that's it, and you
+  shouldn't need to re-derive requirements from scratch. If you're talking
+  to the human directly instead (no orchestrator on this team, or the ask
+  you were handed is still genuinely vague), reach that understanding
+  yourself before planning — the `grilling` skill (or equivalent) is good
+  for this when available. Either way, don't start writing steps against
+  a goal you don't actually understand yet.
 - Read enough of the codebase to ground the plan in what's actually there
   — existing patterns, relevant files, prior art — rather than proposing a
   design in the abstract.

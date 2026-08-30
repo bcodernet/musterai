@@ -76,6 +76,26 @@ muster stop-team <team-name>        # close its herdr workspace, remove its work
 | `react-native-developer` | opus | yes | React Native + Firebase (mobile) |
 | `flask-developer` | sonnet | yes | Python Flask + MySQL |
 
+## Reaching a shared understanding before you build
+
+`orchestrator` and `planner` are both instructed to interview you before
+committing to an approach for anything beyond a quick, unambiguous fix —
+using a structured-interview skill (e.g. Matt Pocock's `grilling` skill,
+if you have it installed) when one's available, plain back-and-forth
+otherwise. Whichever of them you're talking to writes the result to
+`MUSTER_BRIEF.md` at the project root, which becomes the shared source of
+truth: `planner` reads it instead of re-deriving requirements, and
+`orchestrator` dispatches against it. It's team scratch, not project
+documentation — don't commit it (add it to the project's `.gitignore` if
+it starts showing up in `git status`).
+
+One mechanical detail worth knowing: `orchestrator`/`planner` both work
+directly in the main checkout, so they both see this file — but
+worktree-isolated teammates (`builder` and similar) work in a separate
+directory and can't see it. `orchestrator` folds the relevant context
+directly into what it dispatches to them rather than just pointing at the
+file.
+
 ## Team presets
 
 `teams/*.yaml` — `planner-builder-tester`, `databricks-app-team`,
