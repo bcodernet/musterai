@@ -13,8 +13,8 @@ would happen (including the real herdr command) without launching claude or
 creating a real git worktree, so it's the safe way to try something new.
 
 1. Get oriented
-   muster roles                              # the 11 available personas
-   muster presets                            # the 4 built-in team presets
+   muster roles                              # the 13 available personas
+   muster presets                            # the 6 built-in team presets
 
 2. Spawn one agent, solo
    muster spawn data-engineer                # instance named "data-engineer"

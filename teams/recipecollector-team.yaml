@@ -1,0 +1,9 @@
+name: recipecollector-team
+description: RecipeCollector (Python Flask + MySQL) feature team.
+roles:
+  - role: orchestrator
+    count: 1
+  - role: flask-developer
+    count: 1
+  - role: tester-reviewer
+    count: 1

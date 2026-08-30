@@ -66,13 +66,16 @@ muster stop-team <team-name>        # close its herdr workspace, remove its work
 | `sql-analytics-engineer` | sonnet | yes | warehouse SQL models, metrics |
 | `devops-infra` | sonnet | yes | CI/CD, Asset Bundles, infra |
 | `docs-writer` | haiku | yes | README/CONTEXT.md/ADRs |
+| `react-native-developer` | opus | yes | React Native + Firebase (mobile) |
+| `flask-developer` | sonnet | yes | Python Flask + MySQL |
 
 ## Team presets
 
 `teams/*.yaml` — `planner-builder-tester`, `databricks-app-team`,
-`data-pipeline-team`, `full-stack-team`. `just team <name>` also accepts an
-ad hoc comma-separated role list instead of a preset name (repeat a role for
-more than one instance): `just team builder,builder,tester-reviewer`.
+`data-pipeline-team`, `full-stack-team`, `biblestrength-team`,
+`recipecollector-team`. `just team <name>` also accepts an ad hoc
+comma-separated role list instead of a preset name (repeat a role for more
+than one instance): `just team builder,builder,tester-reviewer`.
 
 ## Setup
 
